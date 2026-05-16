@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>もぐらたたきゲーム</title>
+
+<style>
+body{
+    margin:0;
+    font-family:sans-serif;
+    text-align:center;
+    background:#87ceeb;
+    overflow:hidden;
+}
+
+h1{
+    margin:10px 0;
+}
+
+#topArea{
+    margin-bottom:10px;
+}
+
+#info{
+    font-size:24px;
+    font-weight:bold;
+    margin:10px;
+}
+
+#game{
+    width:720px;
+    max-width:95vw;
+    margin:auto;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:20px;
+}
+
+.hole{
+    position:relative;
+    width:100%;
+    aspect-ratio:1/1;
+    background:#5b3823;
+    border-radius:50%;
+    overflow:hidden;
+    box-shadow: inset 0 8px 0 rgba(0,0,0,0.3);
+}
+
+.character{
+    position:absolute;
+    width:80%;
+    height:80%;
+    object-fit:contain;
+    left:50%;
+    bottom:-100%;
+    transform:translateX(-50%);
+    transition:bottom 0.12s;
+    cursor:pointer;
+    user-select:none;
+}
+
+.character.up{
+    bottom:5%;
+}
+
+button{
+    padding:10px 20px;
+    font-size:18px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    background:#ff9800;
+    color:white;
+}
+
+select{
+    padding:8px;
+    font-size:18px;
+    border-radius:8px;
+}
+
+#ranking{
+    margin-top:20px;
+    display:inline-block;
+    background:white;
+    padding:15px 30px;
+    border-radius:15px;
+    font-size:20px;
+    font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<h1>もぐらたたきゲーム</h1>
+
+<div id="topArea">
+
+<select id="difficulty">
+    <option value="easy">簡単（長い）</option>
+    <option value="normal" selected>普通</option>
+    <option value="hard">難しい（短い）</option>
+</select>
+
+<button id="startBtn">ゲームスタート</button>
+
+</div>
+
+<div id="info">
+    スコア：
+    <span id="score">0</span>
+
+    　
+
+    残り：
+    <span id="time">15</span>秒
+</div>
+
+<div id="game">
+    <div class="hole"><img class="character"></div>
+    <div class="hole"><img class="character"></div>
+    <div class="hole"><img class="character"></div>
+    <div class="hole"><img class="character"></div>
+    <div class="hole"><img class="character"></div>
+    <div class="hole"><img class="character"></div>
+</div>
+
+<div id="ranking">
+    ベストスコア TOP3
+    <div id="bestScores"></div>
+</div>
+
+<audio id="okSound" src="ピコッ.mp3"></audio>
+<audio id="ngSound" src="パフ.mp3"></audio>
+<audio id="bossSound" src="じゃん.mp3"></audio>
+
+<script>
+const okImages = [
+    "OK1.png",
+    "OK2.png",
+    "OK3.png",
+    "OK4.png",
+    "OK5.png"
+];
+
+const ngImages = [
+    "NG1.png",
+    "NG2.png",
+    "NG3.png",
+    "NG4.png"
+];
+
+const bossImage = "boss1.png";
+
+const chars = document.querySelectorAll(".character");
+
+const scoreEl = document.getElementById("score");
+const timeEl = document.getElementById("time");
+const startBtn = document.getElementById("startBtn");
+const difficultyEl = document.getElementById("difficulty");
+const bestScoresEl = document.getElementById("bestScores");
+
+const okSound = document.getElementById("okSound");
+const ngSound = document.getElementById("ngSound");
+const bossSound = document.getElementById("bossSound");
+
+let score = 0;
+let timeLeft = 15;
+let playing = false;
+let gameTimer;
+let spawnTimer;
+let bossCount = 0;
+let showTime = 700;
+
+function displayBestScores(){
+
+    const scores =
+        JSON.parse(localStorage.getItem("moguraBest") || "[]");
+
+    if(scores.length === 0){
+        bestScoresEl.innerHTML = "まだ記録なし";
+        return;
+    }
+
+    bestScoresEl.innerHTML =
+        scores.map((s,i)=>
+            `${i+1}位：${s}点`
+        ).join("<br>");
+}
+
+function saveBestScore(newScore){
+
+    let scores =
+        JSON.parse(localStorage.getItem("moguraBest") || "[]");
+
+    scores.push(newScore);
+
+    scores.sort((a,b)=>b-a);
+
+    scores = scores.slice(0,3);
+
+    localStorage.setItem(
+        "moguraBest",
+        JSON.stringify(scores)
+    );
+
+    displayBestScores();
+}
+
+displayBestScores();
+
+function hideAll(){
+
+    chars.forEach(char=>{
+        char.classList.remove("up");
+        char.dataset.type = "";
+    });
+}
+
+function spawnCharacter(){
+
+    hideAll();
+
+    const char =
+        chars[Math.floor(Math.random()*chars.length)];
+
+    let type;
+    let image;
+
+    // bossは2回だけ
+    if(bossCount < 2 && Math.random() < 0.08){
+
+        type = "boss";
+        image = bossImage;
+        bossCount++;
+
+    }else if(Math.random() < 0.7){
+
+        type = "ok";
+        image =
+            okImages[
+                Math.floor(Math.random()*okImages.length)
+            ];
+
+    }else{
+
+        type = "ng";
+        image =
+            ngImages[
+                Math.floor(Math.random()*ngImages.length)
+            ];
+    }
+
+    char.src = image;
+    char.dataset.type = type;
+
+    char.classList.add("up");
+
+    setTimeout(()=>{
+        char.classList.remove("up");
+    }, showTime);
+}
+
+chars.forEach(char=>{
+
+    char.addEventListener("click", ()=>{
+
+        if(!playing) return;
+
+        if(!char.classList.contains("up")) return;
+
+        const type = char.dataset.type;
+
+        if(type === "ok"){
+
+            score += 20;
+
+            okSound.currentTime = 0;
+            okSound.play();
+
+        }else if(type === "ng"){
+
+            score -= 10;
+
+            if(score < 0) score = 0;
+
+            ngSound.currentTime = 0;
+            ngSound.play();
+
+        }else if(type === "boss"){
+
+            score += 1000;
+
+            bossSound.currentTime = 0;
+            bossSound.play();
+        }
+
+        scoreEl.textContent = score;
+
+        char.classList.remove("up");
+    });
+
+});
+
+function setDifficulty(){
+
+    const diff = difficultyEl.value;
+
+    if(diff === "easy"){
+        showTime = 1200;
+    }
+    else if(diff === "normal"){
+        showTime = 700;
+    }
+    else{
+        showTime = 350;
+    }
+}
+
+function startGame(){
+
+    setDifficulty();
+
+    score = 0;
+    timeLeft = 15;
+    bossCount = 0;
+    playing = true;
+
+    scoreEl.textContent = score;
+    timeEl.textContent = timeLeft;
+
+    startBtn.disabled = true;
+
+    hideAll();
+
+    spawnCharacter();
+
+    spawnTimer = setInterval(()=>{
+
+        spawnCharacter();
+
+    }, showTime + 100);
+
+    gameTimer = setInterval(()=>{
+
+        timeLeft--;
+
+        timeEl.textContent = timeLeft;
+
+        if(timeLeft <= 0){
+
+            clearInterval(gameTimer);
+            clearInterval(spawnTimer);
+
+            playing = false;
+
+            hideAll();
+
+            saveBestScore(score);
+
+            alert(
+                "ゲーム終了！\nスコア：" + score
+            );
+
+            startBtn.disabled = false;
+        }
+
+    },1000);
+}
+
+startBtn.addEventListener("click", startGame);
+</script>
+
+</body>
+</html>
